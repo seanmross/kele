@@ -1,6 +1,6 @@
 require 'httparty'
 require 'json'
-require '/Users/seanross/Documents/bloc/projects/kele/lib/roadmap.rb'
+require_relative 'roadmap'
 
 class Kele
   include HTTParty
@@ -9,19 +9,38 @@ class Kele
 
   def initialize(email, password)
     response = self.class.post("#{BASE_URI}/sessions", body: { "email": email, "password": password })
-    JSON.parse(response.body)
     raise "Invalid email or password" if response.code != 200
+    @kele_client = JSON.parse(response.body)
     @auth_token = response["auth_token"]
+    @user_id = response["user"]["id"]
   end
 
   def get_me
     response = self.class.get("#{BASE_URI}/users/me", headers: { "authorization" => @auth_token })
-    JSON.parse(response.body)
+    raise "Invalid authorization" if response.code != 200
+    @user = JSON.parse(response.body)
   end
 
   def get_mentor_availability(mentor_id)
     response = self.class.get("#{BASE_URI}/mentors/#{mentor_id}/student_availability", headers: { "authorization" => @auth_token })
+    raise "Invalid mentor id" if response.code != 200
     @mentor_availability = JSON.parse(response.body)
+  end
+
+  def get_messages(page = nil)
+    if page.nil?
+      response = self.class.get("#{BASE_URI}/message_threads", headers: { "authorization" => @auth_token })
+    else
+      response = self.class.get("#{BASE_URI}/message_threads?page=#{page}", headers: { "authorization" => @auth_token })
+    end
+    raise "Invalid page number" if response.code != 200
+    @messages = JSON.parse(response.body)
+  end
+
+  def create_message(recipient_id, subject, message)
+    response = self.class.post("#{BASE_URI}/messages", body: { "user_id": @user_id, "recipient_id": recipient_id, "subject": subject, "stripped-text": message }, headers: { "authorization" => @auth_token })
+    raise "Invalid message" if response.code != 200
+    puts response
   end
 
 end
